@@ -13,13 +13,13 @@ cd "$(dirname "$0")"
 
 # Install folly
 cd folly/folly
-sudo make uninstall
-sudo make install
+make uninstall
+make install
 
 # Install proxygen
 cd ../..
-sudo make uninstall
-sudo make install
+make uninstall
+make install
 
 # Make sure the libraries are available
-sudo /sbin/ldconfig
+/sbin/ldconfig
