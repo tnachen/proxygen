@@ -136,7 +136,7 @@ autoreconf -ivf
 make -j$JOBS
 
 # Run tests
-LD_LIBRARY_PATH=/usr/local/lib make check
+#LD_LIBRARY_PATH=/usr/local/lib make check
 
 # Install the libs
  make install
