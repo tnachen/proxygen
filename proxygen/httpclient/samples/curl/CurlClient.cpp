@@ -23,7 +23,17 @@ CurlClient::CurlClient(EventBase* evb, HTTPMethod httpMethod, const URL& url,
                        const HTTPHeaders& headers, const string& inputFilename,
                        bool h2c):
     evb_(evb), httpMethod_(httpMethod), url_(url),
-    inputFilename_(inputFilename), h2c_(h2c) {
+    inputFilename_(inputFilename), postData_(""), h2c_(h2c) {
+  headers.forEach([this] (const string& header, const string& val) {
+      request_.getHeaders().add(header, val);
+    });
+}
+
+CurlClient::CurlClient(EventBase* evb, const URL& url, const HTTPHeaders& headers,
+                       const string& postData,
+                       bool h2c):
+    evb_(evb), httpMethod_(HTTPMethod::POST), url_(url),
+    inputFilename_(""), postData_(postData), h2c_(h2c) {
   headers.forEach([this] (const string& header, const string& val) {
       request_.getHeaders().add(header, val);
     });
@@ -105,21 +115,28 @@ void CurlClient::connectSuccess(HTTPUpstreamSession* session) {
 
   unique_ptr<IOBuf> buf;
   if (httpMethod_ == HTTPMethod::POST) {
+    if (inputFilename_ != "") {
+      const uint16_t kReadSize = 4096;
+      ifstream inputFile(inputFilename_, ios::in | ios::binary);
 
-    const uint16_t kReadSize = 4096;
-    ifstream inputFile(inputFilename_, ios::in | ios::binary);
-
-    // Reading from the file by chunks
-    // Important note: It's pretty bad to call a blocking i/o function like
-    // ifstream::read() in an eventloop - but for the sake of this simple
-    // example, we'll do it.
-    // An alternative would be to put this into some folly::AsyncReader
-    // object.
-    while (inputFile.good()) {
-      buf = IOBuf::createCombined(kReadSize);
-      inputFile.read((char*)buf->writableData(), kReadSize);
-      buf->append(inputFile.gcount());
-      txn_->sendBody(move(buf));
+      // Reading from the file by chunks
+      // Important note: It's pretty bad to call a blocking i/o function like
+      // ifstream::read() in an eventloop - but for the sake of this simple
+      // example, we'll do it.
+      // An alternative would be to put this into some folly::AsyncReader
+      // object.
+      while (inputFile.good()) {
+        buf = IOBuf::createCombined(kReadSize);
+        inputFile.read((char*)buf->writableData(), kReadSize);
+        buf->append(inputFile.gcount());
+        txn_->sendBody(move(buf));
+      }
+    } else {
+        auto len = postData_.size();
+        buf = IOBuf::create(len);
+        memcpy(buf->writableTail(), postData_.c_str(), len);
+        buf->append(len);
+        txn_->sendBody(move(buf));
     }
   }
 
